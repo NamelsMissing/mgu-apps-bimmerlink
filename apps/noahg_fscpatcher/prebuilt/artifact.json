@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "id": "noahg_fscpatcher",
+  "version": "1.0.0",
+  "mguHmi": [
+    "ID7"
+  ],
+  "sha256": "73f7522eb0fbc63cfe1c52d66107a6b2a3b3ec84582df43e4dcf1d8592d19554",
+  "sourceSha256": "4dc074973c0a2132312e27b04e9c5e57f384ecf5c54cbd86241e6d55d37fd854"
+}
