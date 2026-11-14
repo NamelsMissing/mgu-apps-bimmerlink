@@ -98,7 +98,10 @@ test('cooperating HU diagnostic apps yield to an active wireless TASU lease', ()
 });
 
 test('installed service is tied to OAP lifecycle without a network management port', () => {
+  const component = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../native/hu-obd-adapter/prebuilt/component.json')));
   const unit = fs.readFileSync(path.resolve(__dirname, '../native/hu-obd-adapter/prebuilt/units/mgu-obd-adapter.service'), 'utf8');
+  assert.equal(component.optional, true);
+  assert.equal(component.uninstallable, true);
   assert.match(unit, /^BindsTo=oapcontroller\.service$/m);
   assert.match(unit, /^PartOf=oapcontroller\.service$/m);
   assert.match(unit, /^WantedBy=oapcontroller\.service$/m);

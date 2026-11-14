@@ -8,6 +8,7 @@
     "ID7"
   ],
   "optional": true,
+  "uninstallable": true,
   "requires": {
     "mgu-deploy": "0.4.0"
   },
