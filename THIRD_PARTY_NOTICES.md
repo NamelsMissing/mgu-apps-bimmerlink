@@ -9,9 +9,10 @@ The Ubuntu glyph atlases in `kit/runtime/fonts/` retain the Ubuntu Font
 Licence 1.0 in `UFL-Ubuntu.txt`. The Noto Sans SC atlas retains the SIL Open
 Font License in `OFL-NotoSansSC.txt`.
 
-The native service is built with the Go standard library. The Go Authors' BSD
-license is included in
-[native/mgu-fscpatch/prebuilt/LICENSE-Go.txt](native/mgu-fscpatch/prebuilt/LICENSE-Go.txt).
+The native services are built with the Go standard library. The Go Authors'
+BSD license is included with both
+[FSC Patch](native/mgu-fscpatch/prebuilt/LICENSE-Go.txt) and
+[OBD Bridge](native/hu-obd-adapter/prebuilt/LICENSE-GO.txt).
 
 No BMW SDK, firmware, donor bundle, proprietary binary, vehicle file, or
 captured FSC is included. The Store supplies its SDK from the owner's head

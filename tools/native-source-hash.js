@@ -12,7 +12,7 @@ function sourceHash(dir) {
       const stat = fs.lstatSync(path.join(dir, file));
       if (stat.isSymbolicLink()) throw new Error('Symlink is not allowed: ' + file);
       if (stat.isDirectory()) { walk(file); continue; }
-      if (name === 'go.mod' || name === 'go.sum' ||
+      if (name === 'go.mod' || name === 'go.sum' || name.endsWith('.js') ||
           (name.endsWith('.go') && !name.endsWith('_test.go')) ||
           /\.(c|h|ld)$/.test(name)) files.push(file);
     }

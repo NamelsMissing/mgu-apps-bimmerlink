@@ -1,4 +1,4 @@
-name: Validate FSC Patcher
+name: Validate released apps
 
 on:
   push:
@@ -30,5 +30,6 @@ jobs:
       - run: npm test
       - run: npm run test:generator
       - run: go -C native/mgu-fscpatch test -race ./...
+      - run: go -C native/hu-obd-adapter test -race ./...
       - run: npm run export:public
       - run: npm run export:usb
