@@ -91,6 +91,17 @@ func TestDevelopmentCapabilityPolicy(t *testing.T) {
 	}
 }
 
+func TestHSFZAliveResponseValidation(t *testing.T) {
+	if e := checkRequest(frame(0x13, []byte{0, 0xf4})); e != nil {
+		t.Fatal(e)
+	}
+	for _, body := range [][]byte{nil, {0}, {1, 0xf4}, {0, 0x12}, {0, 0xff}, {0, 0xf4, 0x22}} {
+		if checkRequest(frame(0x13, body)) == nil {
+			t.Fatalf("invalid alive response accepted: %x", body)
+		}
+	}
+}
+
 func TestConfigValidation(t *testing.T) {
 	c := defaults()
 	if e := c.validate(); e != nil {

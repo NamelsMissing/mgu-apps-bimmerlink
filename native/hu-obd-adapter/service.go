@@ -105,7 +105,11 @@ type event struct {
 }
 
 func newService(c config) *service {
-	s := &service{config: c, probeGate: make(chan struct{}, 1), status: status{Version: version, Enabled: true, State: "waiting_hotspot", Backend: "unverified", Capabilities: []string{"bm3_protocol", "diagnostic_reads", "connection_sessions", "dme_metadata_reads", "bounded_dynamic_memory_probe"}, Validation: "BM3 protocol only; compatibility depends on the vehicle and BM3 version"}}
+	s := &service{config: c, probeGate: make(chan struct{}, 1), status: status{
+		Version: version, Enabled: true, State: "waiting_hotspot", Backend: "unverified",
+		Capabilities: []string{"bm3_protocol", "diagnostic_reads", "connection_sessions", "dme_metadata_reads", "bounded_dynamic_memory_probe", "hsfz_keepalive"},
+		Validation:   "ENET transport tested in simulation; BimmerLink compatibility unverified on a vehicle",
+	}}
 	s.firewall = newFirewall(runNFT)
 	s.status.ExpectedHotspot = c.HotspotInterface
 	s.newTASU = s.openTASU
@@ -525,6 +529,7 @@ func (s *service) handleClient(parent context.Context, c net.Conn) {
 func (s *service) relay(ctx context.Context, c net.Conn, v vehicle, localVIN ...string) error {
 	done := make(chan error, 2)
 	pendingReads := make(map[byte]byte)
+	virtualGateway := len(localVIN) == 1 && validVIN(localVIN[0])
 	var writer sync.Mutex
 	writeClient := func(frames ...[]byte) error {
 		writer.Lock()
@@ -569,11 +574,23 @@ func (s *service) relay(ctx context.Context, c net.Conn, v vehicle, localVIN ...
 				return
 			}
 			activity()
-			if len(b) == 11 && len(localVIN) == 1 && validVIN(localVIN[0]) && bytes.Equal(b[7:], []byte{0x10, 0x22, 0xf1, 0x90}) {
+			control := binary.BigEndian.Uint16(b[4:])
+			if virtualGateway && control != 1 {
+				// HSFZ keepalives terminate at the virtual gateway. TASU
+				// receives only diagnostic requests.
+				if control == hsfzAliveCheck && len(b) == 8 && isTesterAddress(b[6]) && b[7] == tasuGatewayAddress {
+					if e = writeClient(frame(2, b[6:])); e != nil {
+						done <- e
+						return
+					}
+				}
+				continue
+			}
+			if virtualGateway && len(b) == 11 && bytes.Equal(b[7:], []byte{tasuGatewayAddress, 0x22, 0xf1, 0x90}) {
 				s.logOperation(b, "request", "gateway_vin_cache")
 				// TASU exposes a virtual ENET gateway. Its VIN is the same real
 				// vehicle VIN already validated during this discovery session.
-				response := frame(1, append([]byte{0x10, b[6], 0x62, 0xf1, 0x90}, []byte(localVIN[0])...))
+				response := frame(1, append([]byte{tasuGatewayAddress, b[6], 0x62, 0xf1, 0x90}, []byte(localVIN[0])...))
 				if e = writeClient(frame(2, b[6:]), response); e != nil {
 					done <- e
 					return

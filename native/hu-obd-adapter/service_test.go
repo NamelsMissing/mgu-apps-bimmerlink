@@ -23,9 +23,20 @@ func TestRelayPreservesAcknowledgementsPendingAndReplies(t *testing.T) {
 	go func() { done <- s.relay(ctx, server, gatewaySession{upstream}) }()
 	req := frame(1, []byte{0xf4, 0x12, 0x22, 0xf1, 0x90})
 	want := [][]byte{frame(2, req[6:]), frame(1, []byte{0x12, 0xf4, 0x7f, 0x22, 0x78}), frame(1, []byte{0x12, 0xf4, 0x62, 0xf1, 0x90, 'A'})}
+	alive := frame(0x12, nil)
+	aliveReply := frame(0x13, []byte{0, 0xf4})
 	emulated := make(chan error, 1)
 	go func() {
+		if e := writeAll(peer, alive); e != nil {
+			emulated <- e
+			return
+		}
 		got, e := readFrame(peer)
+		if e != nil || !bytes.Equal(got, aliveReply) {
+			emulated <- errors.New("gateway did not receive the alive response")
+			return
+		}
+		got, e = readFrame(peer)
 		if e != nil {
 			emulated <- e
 			return
@@ -43,6 +54,12 @@ func TestRelayPreservesAcknowledgementsPendingAndReplies(t *testing.T) {
 		emulated <- nil
 	}()
 	client.SetDeadline(time.Now().Add(3 * time.Second))
+	if got, e := readFrame(client); e != nil || !bytes.Equal(got, alive) {
+		t.Fatalf("alive check changed: %x %v", got, e)
+	}
+	if e := writeAll(client, aliveReply); e != nil {
+		t.Fatal(e)
+	}
 	for _, b := range req {
 		if _, e := client.Write([]byte{b}); e != nil {
 			t.Fatal(e)
@@ -63,7 +80,7 @@ func TestRelayPreservesAcknowledgementsPendingAndReplies(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("session pumps leaked")
 	}
-	if st := s.snapshot(); st.Requests != 1 || st.Responses != 2 {
+	if st := s.snapshot(); st.Requests != 2 || st.Responses != 2 {
 		t.Fatal(st)
 	}
 }

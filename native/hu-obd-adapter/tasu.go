@@ -244,7 +244,7 @@ func (t *tasuSession) WriteFrame(b []byte) error {
 		return io.ErrClosedPipe
 	default:
 	}
-	if len(b) >= 6 && binary.BigEndian.Uint16(b[4:]) == 0x12 {
+	if len(b) >= 6 && binary.BigEndian.Uint16(b[4:]) == hsfzAliveCheck {
 		return nil
 	}
 	v, _ := json.Marshal(map[string]string{"hex": hex.EncodeToString(b)})

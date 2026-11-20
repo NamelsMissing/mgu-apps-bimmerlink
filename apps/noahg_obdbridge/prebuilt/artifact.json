@@ -1,10 +1,10 @@
 {
   "schema": 1,
   "id": "noahg_obdbridge",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "mguHmi": [
     "ID7"
   ],
-  "sha256": "ec2f6a4d2eaab992589a5dde9191bd350e6ef6b01a7a0f91d14a265fd8efadc7",
-  "sourceSha256": "a3120b7d5ea7ca815f1f377a7de0ea18a632e2ee89a1e6af4099ac51104c675f"
+  "sha256": "45f37841b4a4e0509e603770c85ebd441f7f74deee0a4096627177efe1ee2814",
+  "sourceSha256": "47a03f6c78f042c0fb7f5a2efdba8cce795c62ee640d0b78b6a536a6b8ac3131"
 }

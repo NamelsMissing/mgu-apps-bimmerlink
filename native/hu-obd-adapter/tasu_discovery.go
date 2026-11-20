@@ -13,6 +13,8 @@ import (
 var errVehicleUnavailable = errors.New("ENET gateway and TASU VIN read unavailable")
 var errVINRefused = errors.New("vehicle VIN unavailable through TASU")
 
+const tasuGatewayAddress = 0x10
+
 type vinNegativeReply struct{ nrc byte }
 
 func (e vinNegativeReply) Error() string { return "ECU refused VIN read" }
@@ -298,7 +300,7 @@ func (s *service) discoverTASU(ctx context.Context) (_ gateway, resultErr error)
 	s.record(fmt.Sprintf("tasu_vin_source_0x%02X", ecu))
 	// The adapter presents the standard ENET gateway address. This is a
 	// virtual gateway, independent of which physical ECU supplied the VIN.
-	identity, e := tasuIdentification(vin, 0x10, mac)
+	identity, e := tasuIdentification(vin, tasuGatewayAddress, mac)
 	if e != nil {
 		return gateway{}, e
 	}

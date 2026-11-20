@@ -1,13 +1,15 @@
 # OBD Bridge service
 
 The `mgu-obd-adapter` service is the native companion for OBD Bridge
-`1.0.0`. It provides ENET discovery on UDP 6811 and diagnostic transport on
+`1.1.0`. It provides ENET discovery on UDP 6811 and diagnostic transport on
 TCP 6801 over the car hotspot. The committed Linux amd64 binary is built from
 this directory with the Go standard library.
 
-Version `1.0.0` supports only the observed bootmod3 (BM3) diagnostic protocol.
-The allowlist and compatibility tests cover that sequence; other ENET clients
-and protocol sequences are outside this release's supported surface.
+Version `1.1.0` supports the observed bootmod3 (BM3) sequence and adds HSFZ
+keepalive handling for experimental BimmerLink use in ENET Wi-Fi mode. The
+real gateway handles its own keepalives. The virtual TASU gateway acknowledges
+addressed keepalive queries locally and consumes keepalive responses without
+sending them to the TASU provider.
 
 ## Security boundary
 
@@ -61,6 +63,7 @@ source or binary metadata.
 The test suite covers protocol parsing, operation allowlisting, single-client
 ownership, subnet and interface confinement, firewall lifecycle, Unix-socket
 permissions, redacted exports, TASU request serialization, reply matching,
-timeouts, cancellation, and shutdown cleanup. BM3 compatibility remains
-dependent on the specific vehicle and software version. Other diagnostic
-clients are not supported by this release.
+timeouts, cancellation, and shutdown cleanup. Loopback tests exercise ENET
+discovery, keepalive exchange, and fault and data reads. BM3 compatibility varies
+by vehicle and software version. BimmerLink still needs validation with a real
+vehicle and phone.

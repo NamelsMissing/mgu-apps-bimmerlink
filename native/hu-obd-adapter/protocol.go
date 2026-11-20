@@ -9,6 +9,11 @@ import (
 
 const maxFrame = 1024 * 1024
 
+const (
+	hsfzAliveCheck    = 0x12
+	hsfzAliveResponse = 0x13
+)
+
 var discoveryProbe = []byte{0, 0, 0, 0, 0, 0x11}
 
 // HSFZ lengths exclude the six-byte header. Control frames need not carry
@@ -69,15 +74,18 @@ func checkRequest(b []byte) error {
 	}
 	t := binary.BigEndian.Uint16(b[4:])
 	if t != 1 {
-		if t == 0x12 && len(b) <= 8 {
+		if t == hsfzAliveCheck && len(b) <= 8 {
+			return nil // legacy alive check forms
+		}
+		if t == hsfzAliveResponse && len(b) == 8 && b[6] == 0 && isTesterAddress(b[7]) {
 			return nil
-		} // client-originated alive response
+		}
 		return errors.New("unsupported client control word")
 	}
 	if len(b) < 9 {
 		return errors.New("empty diagnostic request")
 	}
-	if b[6] < 0xf0 || b[6] > 0xfe {
+	if !isTesterAddress(b[6]) {
 		return errors.New("invalid tester address")
 	}
 	switch b[8] {
@@ -99,6 +107,8 @@ func checkRequest(b []byte) error {
 		return requestDenied{0x11}
 	}
 }
+
+func isTesterAddress(addr byte) bool { return addr >= 0xf0 && addr <= 0xfe }
 
 // An unsupported operation gets a transport acknowledgement and a UDS negative
 // reply. It never reaches an ECU and does not tear down a healthy connection.
