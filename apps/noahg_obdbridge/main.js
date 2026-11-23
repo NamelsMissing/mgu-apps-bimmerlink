@@ -2,7 +2,6 @@
 const fs = require('fs');
 const path = require('path');
 const mgu = require('./kit/mgu');
-const { Canvas } = require('./kit/canvas');
 const { request } = require('./client');
 
 function readEvidence(value) { return value === 'positive_reply' ? 'live' : value === 'requested' ? 'requested' : 'unverified'; }
@@ -97,9 +96,8 @@ mgu.run({ async start(ctx) {
         if (!ended) timer = setTimeout(poll, 2000); };
     timer = setTimeout(poll, 2000);
     ctx.app.on('shutdown', () => { ended = true; clearTimeout(timer); });
+    let shown;
     ctx.loop('MAIN', 1, async () => {
-        const t = ctx.theme(), cv = new Canvas(1600, 520);
-        cv.clear(t.bg);
         const end = endOfPage();
         const lines = showLog ? ['Diagnostic log (UTC)', ...entries.slice(Math.max(0, end - pageSize), end).map(entry => {
             const level = /failed|error/.test(entry.code) ? 'ERROR' : /unavailable|malformed|closed/.test(entry.code) ? 'WARN' : 'INFO';
@@ -118,7 +116,10 @@ mgu.run({ async start(ctx) {
                 (state.tasuVinError ? 'VIN from ' + state.tasuVinTarget + ': ' + (tasuErrors[state.tasuVinError] || 'Read failed') + (state.tasuVinNrc ? ' / NRC ' + state.tasuVinNrc : '') : '') ||
                 tasuErrors[state.tasuError] || errors[state.lastError] || (state.lastError || '').replace(/_/g, ' ') || (state.lastDeniedService ? 'Unavailable operation: ' + state.lastDeniedService + (state.lastDeniedIdentifier ? ' / ' + state.lastDeniedIdentifier : '') : message),
         ] : ['OBD Bridge service unavailable', serviceError, 'Check OBD Bridge service in the Store', '', 'App ' + ctx.spec.version, message];
-        lines.forEach((line, i) => cv.text(line, 48, 45 + i * 53, i === 0 ? 34 : 25, i === 0 ? t.accent : t.text));
-        await ctx.ui.image('MAIN_GFX', cv);
+        const content = lines.join('\n');
+        if (content !== shown) {
+            await ctx.ui.text('STATUS_TEXT', content);
+            shown = content;
+        }
     });
 } });

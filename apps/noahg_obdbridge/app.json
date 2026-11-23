@@ -2,7 +2,7 @@
   "id": "noahg_obdbridge",
   "title": "OBD Bridge",
   "description": "ENET diagnostics over the car hotspot with BM3 support and experimental BimmerLink connectivity.",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "vendor": "noahg",
   "loggingId": "NOBD",
   "iconGlyph": "network",
@@ -27,35 +27,47 @@
     {
       "name": "MAIN",
       "title": "OBD Bridge",
-      "kind": "canvas",
-      "buttons": [
+      "kind": "menu",
+      "items": [
         [
+          "button",
           "BTN_ENABLED",
           "Enable / disable"
         ],
         [
+          "button",
           "BTN_PROBE",
           "Check route"
         ],
         [
+          "button",
           "BTN_EXPORT",
           "Save diagnostics"
         ],
         [
+          "button",
           "BTN_LOG",
           "Status / log"
         ],
         [
+          "button",
           "BTN_OLDER",
           "Older"
         ],
         [
+          "button",
           "BTN_NEWER",
           "Newer"
         ],
         [
+          "button",
           "BTN_CLEAR",
           "Clear view"
+        ],
+        [
+          "scroll",
+          "STATUS_TEXT",
+          "Loading..."
         ]
       ]
     }

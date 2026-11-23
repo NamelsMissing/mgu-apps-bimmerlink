@@ -18,7 +18,7 @@ for public release.
 | App | Version | Support | Description |
 |---|---:|---|---|
 | [**FSC Patch**](apps/noahg_fscpatcher/README.md) | `1.0.0` | iDrive 7 | Inspect, patch, or restore a supported FSC verifier. |
-| [**OBD Bridge**](apps/noahg_obdbridge/README.md) | `1.1.1` | iDrive 7 | ENET diagnostics over the car hotspot, with BM3 support and experimental BimmerLink connectivity. |
+| [**OBD Bridge**](apps/noahg_obdbridge/README.md) | `1.1.2` | iDrive 7 | ENET diagnostics over the car hotspot, with BM3 support and experimental BimmerLink connectivity. |
 
 Each app documents its own requirements, companion services, build commands,
 and validation status. Component dependencies and minimum versions are
