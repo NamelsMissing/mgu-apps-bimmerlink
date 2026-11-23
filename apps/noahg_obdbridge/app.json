@@ -2,7 +2,7 @@
   "id": "noahg_obdbridge",
   "title": "OBD Bridge",
   "description": "ENET diagnostics over the car hotspot with BM3 support and experimental BimmerLink connectivity.",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "vendor": "noahg",
   "loggingId": "NOBD",
   "iconGlyph": "network",
@@ -10,7 +10,7 @@
     "ID7"
   ],
   "requires": {
-    "mgu-obd-adapter": "1.1.0"
+    "mgu-obd-adapter": "1.1.1"
   },
   "signals": {
     "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
@@ -40,6 +40,22 @@
         [
           "BTN_EXPORT",
           "Save diagnostics"
+        ],
+        [
+          "BTN_LOG",
+          "Status / log"
+        ],
+        [
+          "BTN_OLDER",
+          "Older"
+        ],
+        [
+          "BTN_NEWER",
+          "Newer"
+        ],
+        [
+          "BTN_CLEAR",
+          "Clear view"
         ]
       ]
     }

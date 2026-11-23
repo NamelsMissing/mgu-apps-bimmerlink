@@ -49,32 +49,36 @@ func writeAll(w io.Writer, b []byte) error {
 }
 
 type status struct {
-	TASUTrace            tasuTrace       `json:"tasuTrace"`
-	DME                  dmeReadEvidence `json:"dmeReads"`
-	LastDeniedIdentifier string          `json:"lastDeniedIdentifier,omitempty"`
-	Version              string          `json:"version"`
-	Enabled              bool            `json:"enabled"`
-	State                string          `json:"state"`
-	Hotspot              string          `json:"hotspot"`
-	Address              string          `json:"address"`
-	Backend              string          `json:"backend"`
-	Client               bool            `json:"clientConnected"`
-	LastError            string          `json:"lastError,omitempty"`
-	Requests             uint64          `json:"requests"`
-	Responses            uint64          `json:"responses"`
-	Capabilities         []string        `json:"capabilities"`
-	Validation           string          `json:"validation"`
-	Firewall             string          `json:"firewall"`
-	ExpectedHotspot      string          `json:"expectedHotspot"`
-	DiscoveryRequests    uint64          `json:"discoveryRequests"`
-	DiscoveryReplies     uint64          `json:"discoveryReplies"`
-	TASU                 string          `json:"tasu"`
-	TASUError            string          `json:"tasuError,omitempty"`
-	TASUVINError         string          `json:"tasuVinError,omitempty"`
-	TASUVINTarget        string          `json:"tasuVinTarget,omitempty"`
-	TASUVINNRC           string          `json:"tasuVinNrc,omitempty"`
-	DeniedRequests       uint64          `json:"deniedRequests"`
-	LastDeniedService    string          `json:"lastDeniedService,omitempty"`
+	ClientIP               string          `json:"clientIp,omitempty"`
+	TASUTrace              tasuTrace       `json:"tasuTrace"`
+	DME                    dmeReadEvidence `json:"dmeReads"`
+	LastDeniedIdentifier   string          `json:"lastDeniedIdentifier,omitempty"`
+	Version                string          `json:"version"`
+	Enabled                bool            `json:"enabled"`
+	State                  string          `json:"state"`
+	Hotspot                string          `json:"hotspot"`
+	Address                string          `json:"address"`
+	Backend                string          `json:"backend"`
+	Client                 bool            `json:"clientConnected"`
+	LastError              string          `json:"lastError,omitempty"`
+	Requests               uint64          `json:"requests"`
+	Responses              uint64          `json:"responses"`
+	Capabilities           []string        `json:"capabilities"`
+	Validation             string          `json:"validation"`
+	Firewall               string          `json:"firewall"`
+	ExpectedHotspot        string          `json:"expectedHotspot"`
+	TCPAccepted            uint64          `json:"tcpAccepted"`
+	TCPRejected            uint64          `json:"tcpRejected"`
+	DiscoveryWriteFailures uint64          `json:"discoveryWriteFailures"`
+	DiscoveryRequests      uint64          `json:"discoveryRequests"`
+	DiscoveryReplies       uint64          `json:"discoveryReplies"`
+	TASU                   string          `json:"tasu"`
+	TASUError              string          `json:"tasuError,omitempty"`
+	TASUVINError           string          `json:"tasuVinError,omitempty"`
+	TASUVINTarget          string          `json:"tasuVinTarget,omitempty"`
+	TASUVINNRC             string          `json:"tasuVinNrc,omitempty"`
+	DeniedRequests         uint64          `json:"deniedRequests"`
+	LastDeniedService      string          `json:"lastDeniedService,omitempty"`
 }
 
 type service struct {
@@ -142,7 +146,7 @@ func newService(c config) *service {
 func (s *service) record(code string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.events = append(s.events, event{time.Now().UTC().Format(time.RFC3339), code})
+	s.events = append(s.events, event{time.Now().UTC().Format(time.RFC3339Nano), code})
 	if len(s.events) > 100 {
 		s.events = s.events[len(s.events)-100:]
 	}
@@ -158,6 +162,9 @@ func (s *service) fail(code string) {
 func (s *service) snapshot() status {
 	s.mu.Lock()
 	st := s.status
+	if s.client != nil {
+		st.ClientIP, _, _ = net.SplitHostPort(s.client.RemoteAddr().String())
+	}
 	s.mu.Unlock()
 	if s.firewall != nil {
 		st.Firewall = s.firewall.snapshot()
@@ -213,6 +220,10 @@ func (s *service) probeLocked(ctx context.Context, fresh bool) (gateway, error) 
 	s.mu.Unlock()
 	g, e := s.resolve(ctx)
 	if e != nil {
+		s.mu.Lock()
+		s.current = gateway{}
+		s.status.Backend = "unverified"
+		s.mu.Unlock()
 		if errors.Is(e, errVehicleUnavailable) {
 			s.fail("gateway_and_tasu_unavailable")
 		} else if errors.Is(e, errFirewall) {
@@ -223,6 +234,10 @@ func (s *service) probeLocked(ctx context.Context, fresh bool) (gateway, error) 
 		return gateway{}, e
 	}
 	s.mu.Lock()
+	if err := ctx.Err(); err != nil {
+		s.mu.Unlock()
+		return gateway{}, err
+	}
 	s.current = g
 	s.gatewayAt = time.Now()
 	if g.Backend == "tasu" {
@@ -436,6 +451,11 @@ func (s *service) serveDiscovery(ctx context.Context, pc net.PacketConn, network
 				s.mu.Lock()
 				s.status.DiscoveryReplies++
 				s.mu.Unlock()
+			} else {
+				s.mu.Lock()
+				s.status.DiscoveryWriteFailures++
+				s.mu.Unlock()
+				s.record("discovery_reply_write_failed")
 			}
 		}
 	}
@@ -448,16 +468,14 @@ func (s *service) serveTCP(ctx context.Context, ln net.Listener, network *net.IP
 		if e != nil {
 			return
 		}
-		if !peerInNetwork(c.RemoteAddr(), network) {
-			c.Close()
-			continue
-		}
 		s.mu.Lock()
-		if !s.status.Enabled || s.client != nil {
+		if !peerInNetwork(c.RemoteAddr(), network) || !s.status.Enabled || s.client != nil {
+			s.status.TCPRejected++
 			s.mu.Unlock()
 			c.Close()
 			continue
 		}
+		s.status.TCPAccepted++
 		s.client = c
 		s.status.Client = true
 		s.status.DME = dmeReadEvidence{}

@@ -141,6 +141,7 @@ func (s *service) controlHandler() http.Handler {
 			return
 		}
 		st := s.snapshot()
+		st.ClientIP = ""
 		s.mu.Lock()
 		events := append([]event(nil), s.events...)
 		operations := append([]diagnosticOperation(nil), s.operations...)

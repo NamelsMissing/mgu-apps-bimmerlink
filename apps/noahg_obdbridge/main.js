@@ -67,6 +67,19 @@ mgu.run({ async start(ctx) {
         state = await request('POST', '/enabled', { enabled: !state.enabled }); message = '';
     }));
     ctx.ui.onClick('BTN_PROBE', () => action(async () => { message = 'Checking vehicle route'; state = await request('POST', '/probe'); message = 'Vehicle identity answered; client connection needs testing'; }));
+    let showLog = false, entries = [], anchor = null, clearedAt = 0;
+    const pageSize = 8;
+    const endOfPage = () => anchor === null ? entries.length : entries.filter(entry => entry.time <= anchor).length;
+    ctx.ui.onClick('BTN_LOG', () => { showLog = !showLog; });
+    ctx.ui.onClick('BTN_OLDER', () => {
+        const end = endOfPage() - pageSize;
+        if (end > 0) anchor = entries[end - 1].time;
+    });
+    ctx.ui.onClick('BTN_NEWER', () => {
+        const end = endOfPage() + pageSize;
+        anchor = end >= entries.length ? null : entries[end - 1].time;
+    });
+    ctx.ui.onClick('BTN_CLEAR', () => { entries = []; anchor = null; clearedAt = Date.now(); });
     ctx.ui.onClick('BTN_EXPORT', () => action(async () => {
         const data = await request('GET', '/export');
         fs.writeFileSync(path.join(ctx.dataDir, 'hu-obd-diagnostics.json'), JSON.stringify(data, null, 2) + '\n');
@@ -74,21 +87,32 @@ mgu.run({ async start(ctx) {
     }));
     await refresh();
     let timer;
-    const poll = async () => { if (ended) return; await refresh(); if (!ended) timer = setTimeout(poll, 2000); };
+    const poll = async () => { if (ended) return; await refresh();
+        if (showLog) {
+            try {
+                const report = await request('GET', '/export');
+                entries = (report.events || []).filter(entry => Date.parse(entry.time) > clearedAt);
+            } catch (e) { message = 'Diagnostic log unavailable'; }
+        }
+        if (!ended) timer = setTimeout(poll, 2000); };
     timer = setTimeout(poll, 2000);
     ctx.app.on('shutdown', () => { ended = true; clearTimeout(timer); });
     ctx.loop('MAIN', 1, async () => {
         const t = ctx.theme(), cv = new Canvas(1600, 520);
         cv.clear(t.bg);
-        const lines = state ? [
+        const end = endOfPage();
+        const lines = showLog ? ['Diagnostic log (UTC)', ...entries.slice(Math.max(0, end - pageSize), end).map(entry => {
+            const level = /failed|error/.test(entry.code) ? 'ERROR' : /unavailable|malformed|closed/.test(entry.code) ? 'WARN' : 'INFO';
+            return entry.time.slice(0, 19).replace('T', ' ') + '  ' + level + '  ' + (errors[entry.code] || entry.code.replace(/_/g, ' '));
+        })] : state ? [
             names[state.state] || state.state,
-            'Car hotspot: ' + (state.address || 'waiting for ' + (state.expectedHotspot || 'network address')),
-            'Vehicle route: ' + state.backend.replace(/_/g, ' ') + '    Firewall: ' + (state.firewall || 'unknown') + '    TASU: ' + (state.tasu || 'idle'),
-            'Client: ' + (state.clientConnected ? 'connected' : 'none') + '    Discovery: ' + (state.discoveryRequests || 0) + ' received / ' + (state.discoveryReplies || 0) + ' answered',
+            'Network: ' + (state.hotspot || '--') + '    ' + (state.address || 'waiting for ' + (state.expectedHotspot || 'network address')),
+            'Vehicle route: ' + state.backend.replace(/_/g, ' ') + '    Firewall: ' + (state.firewall || 'unknown') + '    TASU: ' + (state.tasu || 'idle') + ' / subscribed: ' + ((state.tasuTrace || {}).subscriptions || 0),
+            'Client: ' + (state.clientConnected ? (state.clientIp || 'connected') : 'none') + '    Discovery: ' + (state.discoveryRequests || 0) + ' received / ' + (state.discoveryReplies || 0) + ' answered / ' + (state.discoveryWriteFailures || 0) + ' send errors',
             'DME reads: ID ' + readEvidence((state.dmeReads || {}).identification) + ' / SWE ' + readEvidence((state.dmeReads || {}).sweMetadata) + ' / memory ' + readEvidence((state.dmeReads || {}).romMemory) + ' / date ' + readEvidence((state.dmeReads || {}).manufactureDate),
-            'App ' + ctx.spec.version + ' / Service ' + state.version + '    Client requests: ' + state.requests + '    Responses: ' + state.responses,
+            'App ' + ctx.spec.version + ' / Service ' + state.version + '    TCP accepted: ' + (state.tcpAccepted || 0) + '    Client requests: ' + state.requests + '    Responses: ' + state.responses,
             'TASU calls: ' + ((state.tasuTrace || {}).requests || 0) + '    ' + ((state.tasuTrace || {}).target || '--') + ' / ' + ((state.tasuTrace || {}).service || '--') + '    Verdict: ' + ((state.tasuTrace || {}).verdict || 'waiting') +
-                '    Events: ' + ((state.tasuTrace || {}).events || 0) + ' / matched: ' + ((state.tasuTrace || {}).matched || 0) + ' / ignored: ' + ((state.tasuTrace || {}).ignored || 0),
+                '    Events: ' + ((state.tasuTrace || {}).events || 0) + ' / matched: ' + ((state.tasuTrace || {}).matched || 0) + ' / ignored: ' + ((state.tasuTrace || {}).ignored || 0) + ' / callbacks: ' + ((state.tasuTrace || {}).callbacks || 0),
             'TASU response: ' + ((state.tasuTrace || {}).lastEvent || 'none received') + (((state.tasuTrace || {}).lastIgnore) ? ' / ' + state.tasuTrace.lastIgnore.replace(/_/g, ' ') : ''),
             (state.tasu !== 'ready' && tasuErrors[state.tasuError]) ||
                 (state.tasuVinError ? 'VIN from ' + state.tasuVinTarget + ': ' + (tasuErrors[state.tasuVinError] || 'Read failed') + (state.tasuVinNrc ? ' / NRC ' + state.tasuVinNrc : '') : '') ||

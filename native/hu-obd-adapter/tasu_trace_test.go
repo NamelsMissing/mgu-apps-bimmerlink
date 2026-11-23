@@ -24,10 +24,12 @@ func TestTASUTraceSeparatesNoEventAndIgnoredReply(t *testing.T) {
 	if s.snapshot().TASUTrace.Matched != 1 {
 		t.Fatal(s.snapshot())
 	}
+	s.observeTASU(workerMessage{Stage: "subscribed"})
+	s.observeTASU(workerMessage{Stage: "callback"})
 	s.observeTASU(workerMessage{Stage: "unowned"})
 	s.observeTASU(workerMessage{Stage: "request", Target: 0x10, SID: 0x22})
 	trace = s.snapshot().TASUTrace
-	if trace.Requests != 2 || trace.Events != 0 || trace.Verdict != "" || trace.LastEvent != "" || trace.Unowned != 1 {
+	if trace.Requests != 2 || trace.Events != 0 || trace.Verdict != "" || trace.LastEvent != "" || trace.Unowned != 1 || trace.Subscriptions != 1 || trace.Callbacks != 1 {
 		t.Fatal(trace)
 	}
 }

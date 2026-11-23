@@ -129,6 +129,9 @@ func (s *service) openTASU(ctx context.Context) (vehicle, error) {
 			switch m.Type {
 			case "tasu_trace":
 				s.observeTASU(m)
+				if m.Stage == "subscribed" {
+					s.record("tasu_subscribed")
+				}
 			case "ready":
 				select {
 				case ready <- true:
@@ -155,7 +158,9 @@ func (s *service) openTASU(ctx context.Context) (vehicle, error) {
 					return
 				}
 			case "error":
-				t.stop(tasuFailure(tasuErrorCode(tasuFailure(m.Code))))
+				code := tasuErrorCode(tasuFailure(m.Code))
+				s.record("tasu_error_" + code)
+				t.stop(tasuFailure(code))
 				return
 			}
 		}

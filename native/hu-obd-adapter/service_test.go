@@ -246,3 +246,27 @@ func TestDiscoveryRelaysActualIdentityAndStaysIdle(t *testing.T) {
 		t.Fatal("malformed input triggered vehicle traffic")
 	}
 }
+
+func TestFailedFreshProbeInvalidatesCachedRoute(t *testing.T) {
+	s := newService(defaults())
+	calls := 0
+	s.resolve = func(context.Context) (gateway, error) {
+		calls++
+		if calls == 1 {
+			return gateway{Address: "127.0.0.2", Identification: testIdentification()}, nil
+		}
+		return gateway{}, errVehicleUnavailable
+	}
+	if _, err := s.probe(context.Background(), false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.probe(context.Background(), true); err == nil {
+		t.Fatal("failed verification reported success")
+	}
+	if _, err := s.probe(context.Background(), false); err == nil || calls != 3 {
+		t.Fatal("failed route was reused", calls, err)
+	}
+	if got := s.snapshot().Backend; got != "unverified" {
+		t.Fatal(got)
+	}
+}

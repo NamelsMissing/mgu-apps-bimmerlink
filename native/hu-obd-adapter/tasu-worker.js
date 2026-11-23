@@ -67,10 +67,13 @@ function createSession(proxy, emit, options) {
     function fail(code) { if (stopped) return; stop(); emit({ type: 'error', code: typeof code === 'string' ? code : 'transport_failed' }); }
     function reply(value) {
         if (stopped) return;
+        emit({ type: 'tasu_trace', stage: 'callback' });
         if (!active || active.waitingRetry || !active.owned) { emit({ type: 'tasu_trace', stage: 'unowned' }); return; }
         if (!value || typeof value !== 'object') return fail('malformed_reply');
-        const raw = value.udsResponse;
-        let b = Buffer.from(raw && raw.data || raw || []);
+        const raw = value.udsResponse === undefined ? (value.data || (typeof value.length === "number" ? value : null)) : value.udsResponse;
+        let b;
+        try { b = Buffer.from(raw && raw.data || raw || []); }
+        catch (e) { return fail('malformed_reply'); }
         const eventVerdict = value.errorCode === undefined ? 'NO_ERROR' : methodVerdict(value.errorCode);
         const pendingVerdict = eventVerdict === 'REQUEST_PENDING';
         // The descriptor supplies both a ByteBuffer and its populated length.
@@ -168,7 +171,7 @@ function createSession(proxy, emit, options) {
             req.buffer.forEach(response => emit({ type: 'frame', hex: response.toString('hex') }));
             const suppressed = [0x10, 0x3e].indexOf(req.uds[0]) >= 0 && (req.uds[1] & 0x80) !== 0;
             if (req.complete || suppressed) clear();
-            else if (!idle) idle = setTimeout(() => { if (active === req) { if (req.target === 0xdf) clear(); else fail('ecu_timeout'); } }, req.target === 0xdf ? (req.reportComplete ? 6000 : quietMs * 4) : replyMs);
+            else if (!idle) idle = setTimeout(() => { if (active === req) { if (req.target === 0xdf && !req.reportComplete) clear(); else fail('ecu_timeout'); } }, req.target === 0xdf ? (req.reportComplete ? 6000 : quietMs * 4) : replyMs);
         } catch (e) { fail(req.owned ? 'request_refused' : 'coordinator_unavailable'); }
         finally { draining = false; if (!active) setImmediate(drain); }
     }
@@ -234,11 +237,12 @@ async function start() {
         { acquire: () => sharedTASU.acquire({ socket: process.env.HUOBD_TASU_LOCK_SOCKET }) });
     try {
         await session.tick(() => proxy.subscribe({ name: 'sendTasuResponse', onReceive: session.reply }));
+        emit({ type: 'tasu_trace', stage: 'subscribed' });
         await monitorAvailability(proxy, session);
     } catch (e) { return startupFailure('subscribe_failed'); }
     const lines = readline.createInterface({ input: process.stdin });
     lines.on('line', line => { try { const value = JSON.parse(line); session.enqueue(value.hex, value.reportComplete); } catch (e) { emit({ type: 'error' }); process.stdin.destroy(); } });
-    lines.on('close', () => { session.stop(); if (proxy.shutdown) Promise.resolve(proxy.shutdown()).then(() => process.exit(0), () => process.exit(1)); else process.exit(0); });
+    lines.on('close', () => { session.stop(); if (proxy.shutdown) session.tick(() => proxy.shutdown()).then(() => process.exit(0), () => process.exit(1)); else process.exit(0); });
 }
 module.exports = { pack, matches, createSession, loadSomeip, methodVerdict, monitorAvailability };
 if (!module.parent) {

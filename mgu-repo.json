@@ -47,7 +47,7 @@
         "ID7"
       ],
       "requires": {
-        "mgu-obd-adapter": "1.1.0"
+        "mgu-obd-adapter": "1.1.1"
       },
       "build": {
         "node": "tools/prebuilt.js",
