@@ -70,6 +70,7 @@ type status struct {
 	TCPAccepted            uint64          `json:"tcpAccepted"`
 	TCPRejected            uint64          `json:"tcpRejected"`
 	DiscoveryWriteFailures uint64          `json:"discoveryWriteFailures"`
+	DiscoveryInvalid       uint64          `json:"discoveryInvalid"`
 	DiscoveryRequests      uint64          `json:"discoveryRequests"`
 	DiscoveryReplies       uint64          `json:"discoveryReplies"`
 	TASU                   string          `json:"tasu"`
@@ -90,6 +91,8 @@ type service struct {
 	events            []event
 	current           gateway
 	gatewayAt         time.Time
+	lastProbeFailure  time.Time
+	probeFailure      error
 	client            net.Conn
 	cancelListeners   context.CancelFunc
 	resolve           func(context.Context) (gateway, error)
@@ -172,6 +175,8 @@ func (s *service) snapshot() status {
 	return st
 }
 
+const failedRouteCooldown = 30 * time.Second
+
 var errDiagnosticClientActive = errors.New("diagnostic client owns the vehicle response stream")
 
 // This protects readers inside the bridge, not TASU access by other HU apps.
@@ -217,11 +222,20 @@ func (s *service) probeLocked(ctx context.Context, fresh bool) (gateway, error) 
 		s.mu.Unlock()
 		return g, nil
 	}
+	if !fresh && time.Since(s.lastProbeFailure) < failedRouteCooldown {
+		err := s.probeFailure
+		s.mu.Unlock()
+		return gateway{}, err
+	}
 	s.mu.Unlock()
 	g, e := s.resolve(ctx)
 	if e != nil {
 		s.mu.Lock()
 		s.current = gateway{}
+		if ctx.Err() == nil {
+			s.lastProbeFailure = time.Now()
+			s.probeFailure = e
+		}
 		s.status.Backend = "unverified"
 		s.mu.Unlock()
 		if errors.Is(e, errVehicleUnavailable) {
@@ -239,6 +253,8 @@ func (s *service) probeLocked(ctx context.Context, fresh bool) (gateway, error) 
 		return gateway{}, err
 	}
 	s.current = g
+	s.lastProbeFailure = time.Time{}
+	s.probeFailure = nil
 	s.gatewayAt = time.Now()
 	if g.Backend == "tasu" {
 		s.status.Backend = "tasu_vin_verified"
@@ -350,6 +366,8 @@ func (s *service) stopListeners() {
 	c := s.client
 	s.status.Address = ""
 	s.status.Hotspot = ""
+	s.lastProbeFailure = time.Time{}
+	s.probeFailure = nil
 	s.current = gateway{}
 	s.status.Backend = "unverified"
 	s.mu.Unlock()
@@ -424,26 +442,28 @@ func peerInNetwork(addr net.Addr, n *net.IPNet) bool {
 func (s *service) serveDiscovery(ctx context.Context, pc net.PacketConn, network *net.IPNet) {
 	defer pc.Close()
 	buf := make([]byte, 4096)
-	var last time.Time
 	for {
 		n, addr, e := pc.ReadFrom(buf)
 		if e != nil {
 			return
 		}
-		if n != len(discoveryProbe) || string(buf[:n]) != string(discoveryProbe) || !peerInNetwork(addr, network) {
+		if !peerInNetwork(addr, network) {
+			continue
+		}
+		if !bytes.Equal(buf[:n], discoveryProbe) {
+			s.mu.Lock()
+			s.status.DiscoveryInvalid++
+			s.mu.Unlock()
 			continue
 		}
 		s.mu.Lock()
 		busy := s.client != nil
 		enabled := s.status.Enabled
-		s.mu.Unlock()
-		if busy || !enabled || time.Since(last) < time.Second {
-			continue
-		}
-		s.mu.Lock()
 		s.status.DiscoveryRequests++
 		s.mu.Unlock()
-		last = time.Now()
+		if busy || !enabled {
+			continue
+		}
 		// Only a client-triggered request reaches the vehicle. No discovery polling.
 		g, e := s.probe(ctx, false)
 		if e == nil {
@@ -521,10 +541,11 @@ func (s *service) handleClient(parent context.Context, c net.Conn) {
 	defer s.unlockProbe()
 	g, e := s.probeLocked(ctx, false)
 	var v vehicle
-	if e == nil {
-		v, e = s.open(ctx, g)
+	if e != nil {
+		return
 	}
-	if e != nil && s.tasuAllowed() {
+	v, e = s.open(ctx, g)
+	if e != nil && g.Backend != "tasu" && s.tasuAllowed() {
 		g, e = s.discoverTASU(ctx)
 		if e == nil {
 			v, e = s.ensureTASU(ctx)

@@ -57,6 +57,10 @@ func (s *service) observeTASU(m workerMessage) {
 		}
 	case "matched":
 		t.Matched++
+	case "timeout_without_callback":
+		t.LastEvent = "ECU reply timed out without a TASU callback"
+	case "timeout_after_callback":
+		t.LastEvent = "ECU reply timed out after a TASU callback"
 	case "provider_pending":
 		t.LastEvent = "provider pending (awaiting ECU reply)"
 	case "other_ecu", "other_reply":

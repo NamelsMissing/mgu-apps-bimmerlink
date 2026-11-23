@@ -247,3 +247,23 @@ test('native trace reports accepted requests, mismatched event metadata and matc
     assert(!JSON.stringify(trace).includes('WBA12345678901234'));
     assert(trace.every(e=>!('hex' in e)&&!('uds' in e)&&!('data' in e)));
 });
+
+test('pending method verdict without a callback times out and late replies cannot complete it', async t => {
+    const events = [];
+    let calls = 0;
+    const session = createSession({ callMethod() {
+        calls++;
+        return Promise.resolve({ TasuErrorEnum: 'REQUEST_PENDING' });
+    } }, event => events.push(event), { replyMs: 25 });
+    t.after(() => session.stop());
+    session.availability(true);
+    session.enqueue(request([0x22, 0xf1, 0x90]));
+    await until(() => events.some(event => event.type === 'error'));
+    response(session, 0x12, [0x62, 0xf1, 0x90, 1]);
+    assert.equal(calls, 1);
+    assert(events.some(event => event.stage === 'timeout_without_callback'));
+    assert.equal(events.find(event => event.type === 'error').code, 'ecu_timeout');
+    const frames = events.filter(event => event.type === 'frame');
+    assert.equal(frames.length, 1);
+    assert.equal(Buffer.from(frames[0].hex, 'hex').readUInt16BE(4), 2);
+});

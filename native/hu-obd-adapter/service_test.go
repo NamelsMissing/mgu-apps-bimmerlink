@@ -239,11 +239,16 @@ func TestDiscoveryRelaysActualIdentityAndStaysIdle(t *testing.T) {
 	if st.DiscoveryRequests != 1 || st.DiscoveryReplies != 1 {
 		t.Fatal("discovery counters", st)
 	}
+	c.Write(discoveryProbe)
+	n, e = c.Read(buf)
+	if e != nil || !bytes.Equal(buf[:n], want) {
+		t.Fatal("cached identity was not returned to a repeat requester", e)
+	}
 	c.SetReadDeadline(time.Now().Add(50 * time.Millisecond))
 	c.Write([]byte("not a discovery request"))
 	c.Read(buf)
-	if probes.Load() != 1 {
-		t.Fatal("malformed input triggered vehicle traffic")
+	if probes.Load() != 1 || s.snapshot().DiscoveryInvalid != 1 {
+		t.Fatal("malformed input was not rejected before vehicle traffic")
 	}
 }
 
@@ -263,7 +268,7 @@ func TestFailedFreshProbeInvalidatesCachedRoute(t *testing.T) {
 	if _, err := s.probe(context.Background(), true); err == nil {
 		t.Fatal("failed verification reported success")
 	}
-	if _, err := s.probe(context.Background(), false); err == nil || calls != 3 {
+	if _, err := s.probe(context.Background(), false); err == nil || calls != 2 {
 		t.Fatal("failed route was reused", calls, err)
 	}
 	if got := s.snapshot().Backend; got != "unverified" {

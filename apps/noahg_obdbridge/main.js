@@ -106,7 +106,7 @@ mgu.run({ async start(ctx) {
             names[state.state] || state.state,
             'Network: ' + (state.hotspot || '--') + '    ' + (state.address || 'waiting for ' + (state.expectedHotspot || 'network address')),
             'Vehicle route: ' + state.backend.replace(/_/g, ' ') + '    Firewall: ' + (state.firewall || 'unknown') + '    TASU: ' + (state.tasu || 'idle') + ' / subscribed: ' + ((state.tasuTrace || {}).subscriptions || 0),
-            'Client: ' + (state.clientConnected ? (state.clientIp || 'connected') : 'none') + '    Discovery: ' + (state.discoveryRequests || 0) + ' received / ' + (state.discoveryReplies || 0) + ' answered / ' + (state.discoveryWriteFailures || 0) + ' send errors',
+            'Client: ' + (state.clientConnected ? (state.clientIp || 'connected') : 'none') + '    Discovery: ' + (state.discoveryRequests || 0) + ' received / ' + (state.discoveryReplies || 0) + ' answered / ' + (state.discoveryWriteFailures || 0) + ' send errors / ' + (state.discoveryInvalid || 0) + ' invalid',
             'DME reads: ID ' + readEvidence((state.dmeReads || {}).identification) + ' / SWE ' + readEvidence((state.dmeReads || {}).sweMetadata) + ' / memory ' + readEvidence((state.dmeReads || {}).romMemory) + ' / date ' + readEvidence((state.dmeReads || {}).manufactureDate),
             'App ' + ctx.spec.version + ' / Service ' + state.version + '    TCP accepted: ' + (state.tcpAccepted || 0) + '    Client requests: ' + state.requests + '    Responses: ' + state.responses,
             'TASU calls: ' + ((state.tasuTrace || {}).requests || 0) + '    ' + ((state.tasuTrace || {}).target || '--') + ' / ' + ((state.tasuTrace || {}).service || '--') + '    Verdict: ' + ((state.tasuTrace || {}).verdict || 'waiting') +

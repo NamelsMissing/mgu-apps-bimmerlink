@@ -65,10 +65,16 @@ function createSession(proxy, emit, options) {
         active = null;
     }
     function fail(code) { if (stopped) return; stop(); emit({ type: 'error', code: typeof code === 'string' ? code : 'transport_failed' }); }
+    function replyTimeout(req) {
+        if (active !== req) return;
+        emit({ type: 'tasu_trace', stage: req.sawCallback ? 'timeout_after_callback' : 'timeout_without_callback' });
+        fail('ecu_timeout');
+    }
     function reply(value) {
         if (stopped) return;
         emit({ type: 'tasu_trace', stage: 'callback' });
         if (!active || active.waitingRetry || !active.owned) { emit({ type: 'tasu_trace', stage: 'unowned' }); return; }
+        active.sawCallback = true;
         if (!value || typeof value !== 'object') return fail('malformed_reply');
         const raw = value.udsResponse === undefined ? (value.data || (typeof value.length === "number" ? value : null)) : value.udsResponse;
         let b;
@@ -90,7 +96,7 @@ function createSession(proxy, emit, options) {
             emit({ type: 'tasu_trace', stage: 'provider_pending' });
             const req = active;
             clearTimeout(idle);
-            idle = setTimeout(() => { if (active === req) fail('ecu_timeout'); }, replyMs);
+            idle = setTimeout(() => replyTimeout(req), replyMs);
             return;
         }
         if (eventVerdict !== 'NO_ERROR') return fail(eventVerdict === 'INVALID_VERDICT' ? 'malformed_reply' : verdictError(eventVerdict));
@@ -106,7 +112,7 @@ function createSession(proxy, emit, options) {
         if (req.buffer.length > 32) return fail();
         const pending = uds[0] === 0x7f && uds[2] === 0x78;
         clearTimeout(idle); idle = null;
-        if (pending) idle = setTimeout(() => fail('ecu_timeout'), replyMs);
+        if (pending) idle = setTimeout(() => replyTimeout(req), replyMs);
         else if (req.target === 0xdf) {
             req.complete = false;
             idle = setTimeout(() => { if (active === req) { req.complete = true; if (req.accepted) clear(); } }, req.reportComplete ? (options.probeQuietMs || 4000) : quietMs);
@@ -147,6 +153,7 @@ function createSession(proxy, emit, options) {
                     clearTimeout(hard); hard = null;
                     release();
                     req.buffer.length = 0;
+                    req.sawCallback = false;
                     req.complete = false;
                     req.waitingRetry = true;
                     clearTimeout(idle); idle = null;
@@ -171,7 +178,7 @@ function createSession(proxy, emit, options) {
             req.buffer.forEach(response => emit({ type: 'frame', hex: response.toString('hex') }));
             const suppressed = [0x10, 0x3e].indexOf(req.uds[0]) >= 0 && (req.uds[1] & 0x80) !== 0;
             if (req.complete || suppressed) clear();
-            else if (!idle) idle = setTimeout(() => { if (active === req) { if (req.target === 0xdf && !req.reportComplete) clear(); else fail('ecu_timeout'); } }, req.target === 0xdf ? (req.reportComplete ? 6000 : quietMs * 4) : replyMs);
+            else if (!idle) idle = setTimeout(() => { if (active === req) { if (req.target === 0xdf && !req.reportComplete) clear(); else replyTimeout(req); } }, req.target === 0xdf ? (req.reportComplete ? 6000 : quietMs * 4) : replyMs);
         } catch (e) { fail(req.owned ? 'request_refused' : 'coordinator_unavailable'); }
         finally { draining = false; if (!active) setImmediate(drain); }
     }

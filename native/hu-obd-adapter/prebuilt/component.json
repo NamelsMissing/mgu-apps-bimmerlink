@@ -1,7 +1,7 @@
 {
   "id": "mgu-obd-adapter",
   "kind": "tool",
-  "version": "1.1.1",
+  "version": "1.1.3",
   "title": "OBD Bridge service",
   "description": "ENET diagnostic bridge with BM3 support and experimental BimmerLink connectivity.",
   "mguHmi": [
@@ -16,7 +16,7 @@
     {
       "path": "hu-obd-adapter",
       "mode": "0755",
-      "sha256": "fb0e551a1fa72b45b1e5eeb10e6b8128d3ab621aec87e8e7faa01bdf738c9aa4"
+      "sha256": "4318cf894d49df9d4bf41a9966377609aac921c8a17a8f0d1abf2fd99cfa1dd5"
     },
     {
       "path": "LICENSE-GO.txt",
@@ -42,6 +42,6 @@
   "recmgr": [
     "mgu-obd-adapter"
   ],
-  "sourceSha256": "a3457abccac2ee410fa7eccad34edcbaaa846dbbcd537fa8fcbcbecb86a03e07",
+  "sourceSha256": "d911d770391746813272e4ac88b0316c25fda79362cb6f5028267c70479287ff",
   "keepRunning": true
 }

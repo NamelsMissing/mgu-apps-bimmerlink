@@ -1,7 +1,7 @@
 # OBD Bridge
 
 OBD Bridge exposes a bounded ENET diagnostic connection through the car's
-existing Wi-Fi hotspot. Version `1.1.2` includes the ID7 control app and the
+existing Wi-Fi hotspot. Version `1.1.3` includes the ID7 control app and the
 Store-managed `mgu-obd-adapter` companion service.
 
 The bridge supports the observed bootmod3 (BM3) diagnostic protocol.

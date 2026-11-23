@@ -1,11 +1,11 @@
 # OBD Bridge service
 
 The `mgu-obd-adapter` service is the native companion for OBD Bridge
-`1.1.1`. It provides ENET discovery on UDP 6811 and diagnostic transport on
+`1.1.3`. It provides ENET discovery on UDP 6811 and diagnostic transport on
 TCP 6801 over the car hotspot. The committed Linux amd64 binary is built from
 this directory with the Go standard library.
 
-Version `1.1.1` supports the observed bootmod3 (BM3) sequence and adds HSFZ
+Version `1.1.3` supports the observed bootmod3 (BM3) sequence and adds HSFZ
 keepalive handling for experimental BimmerLink use in ENET Wi-Fi mode. The
 real gateway handles its own keepalives. The virtual TASU gateway acknowledges
 addressed keepalive queries locally and consumes keepalive responses without
@@ -126,3 +126,17 @@ For BimmerLink, record the exact adapter profile and whether it produces
 discovery, TCP, and an actual diagnostic request. Wireless CarPlay and
 cellular status do not establish an app's local network route. The xA Ultra
 profile remains unverified with this generic endpoint.
+
+### 1.1.3 discovery and retry behavior
+
+A validated cached identity can answer consecutive discovery datagrams.
+Invalid local datagrams are counted separately. A failed automatic route
+check is cached for 30 seconds, so repeated discovery or TCP connection
+attempts do not restart the full VIN sequence immediately. The manual route
+check can retry immediately. TCP does not start a second TASU VIN sequence
+when route resolution already failed.
+
+A TASU reply timeout now records whether any native callback was received
+while the request owned the stream. Callback presence alone does not prove
+a matching ECU response. The G21 evidence still shows zero callbacks, so
+the cause of missing native event delivery requires a vehicle or SDK trace.
